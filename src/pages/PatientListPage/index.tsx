@@ -1,25 +1,45 @@
-import { useState } from "react";
-import { Box, Table, Button, TableHead, Typography, TableCell, TableRow, TableBody } from '@mui/material';
-import axios from 'axios';
+import { useState, useEffect } from "react";
+import {
+  Box,
+  Table,
+  Button,
+  TableHead,
+  Typography,
+  TableCell,
+  TableRow,
+  TableBody,
+} from "@mui/material";
 
-import { PatientFormValues, Patient } from "../../types";
-import AddPatientModal from "../AddPatientModal";
+import axios from "axios";
 
-import HealthRatingBar from "../HealthRatingBar";
+import { useDispatch, useSelector } from "react-redux";
+import { Patient, PatientFormValues } from "../../types";
 
-import patientService from "../../services/patients";
+import { AppDispatch, RootState } from "../../store";
+import { Link } from "react-router-dom";
+import patientServices from "../../services/patientServices";
+import HealthRatingBar from "../../components/HealthRatingBar";
+import AddPatientModal from "./AddPatientModal";
+import { setPatients } from "../../state/patientsReducer";
 
-interface Props {
-  patients : Patient[]
-  setPatients: React.Dispatch<React.SetStateAction<Patient[]>>
-}
-
-const PatientListPage = ({ patients, setPatients } : Props ) => {
-
+const PatientListPage = () => {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [error, setError] = useState<string>();
-
   const openModal = (): void => setModalOpen(true);
+  const dispatch = useDispatch<AppDispatch>();
+  const patients = useSelector((state: RootState) => state.patients);
+  console.log("🚀 ~ PatientListPage ~ patients:", patients);
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const patients: Patient[] = await patientServices.get();
+        dispatch(setPatients(patients));
+      } catch (error) {
+        console.error("Failed fetching patients: " + error);
+      }
+    };
+    fetchPatients();
+  }, [dispatch]);
 
   const closeModal = (): void => {
     setModalOpen(false);
@@ -28,13 +48,15 @@ const PatientListPage = ({ patients, setPatients } : Props ) => {
 
   const submitNewPatient = async (values: PatientFormValues) => {
     try {
-      const patient = await patientService.create(values);
-      setPatients(patients.concat(patient));
+      await patientServices.addPatient(values);
       setModalOpen(false);
     } catch (e: unknown) {
       if (axios.isAxiosError(e)) {
         if (e?.response?.data && typeof e?.response?.data === "string") {
-          const message = e.response.data.replace('Something went wrong. Error: ', '');
+          const message = e.response.data.replace(
+            "Something went wrong. Error: ",
+            ""
+          );
           console.error(message);
           setError(message);
         } else {
@@ -66,7 +88,9 @@ const PatientListPage = ({ patients, setPatients } : Props ) => {
         <TableBody>
           {Object.values(patients).map((patient: Patient) => (
             <TableRow key={patient.id}>
-              <TableCell>{patient.name}</TableCell>
+              <TableCell>
+                <Link to={`/patients/${patient.id}`}>{patient.name}</Link>
+              </TableCell>
               <TableCell>{patient.gender}</TableCell>
               <TableCell>{patient.occupation}</TableCell>
               <TableCell>
@@ -78,9 +102,9 @@ const PatientListPage = ({ patients, setPatients } : Props ) => {
       </Table>
       <AddPatientModal
         modalOpen={modalOpen}
-        onSubmit={submitNewPatient}
         error={error}
         onClose={closeModal}
+        onSubmit={submitNewPatient}
       />
       <Button variant="contained" onClick={() => openModal()}>
         Add New Patient
